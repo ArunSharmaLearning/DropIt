@@ -3,6 +3,7 @@ const multer = require("multer");
 const path = require("path");
 const File = require("../models/file");
 const { v4: uuidv4 } = require("uuid");
+const MAIL_USER = process.env.MAIL_USER
 
 let storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
@@ -14,9 +15,9 @@ let storage = multer.diskStorage({
   },
 });
 
-let upload = multer({ storage, limits: { fileSize: 1000000 * 100 } }).single(
+let upload = multer({ storage, limits: { fileSize: 200 * 1024 * 1024 } }).single(
   "myfile"
-); //100mb
+);
 
 router.post("/", (req, res) => {
   upload(req, res, async (err) => {
@@ -42,8 +43,8 @@ router.post("/", (req, res) => {
 });
 
 router.post("/send", async (req, res) => {
-  const { uuid, emailTo, emailFrom } = req.body;
-  if (!uuid || !emailTo || !emailFrom) {
+  const { uuid, emailTo } = req.body;
+  if (!uuid || !emailTo) {
     return res.status(422).send({ error: "All fields are required." });
   }
 
@@ -51,18 +52,18 @@ router.post("/send", async (req, res) => {
   if (file.sender) {
     return res.status(422).send({ error: "Email already sent once." });
   }
-  file.sender = emailFrom;
+  file.sender = MAIL_USER;
   file.receiver = emailTo;
   const response = await file.save();
   // send mail
   const sendMail = require("../services/emailService");
   sendMail({
-    from: emailFrom,
+    from: MAIL_USER,
     to: emailTo,
     subject: "Drop it",
-    text: `${emailFrom} shared a file with you.`,
+    text: `${MAIL_USER} shared a file with you.`,
     html: require("../services/emailTemplate")({
-      emailFrom,
+      emailFrom: MAIL_USER,
       downloadLink: `${process.env.APP_BASE_URL}/files/${file.uuid}?source=email`,
       size: parseInt(file.size / 1000) + " KB",
       expires: "24 hours",
